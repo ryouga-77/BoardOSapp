@@ -26,7 +26,8 @@
             --nav-bg: rgba(248, 248, 248, 0.85);
             --sheet-bg: #F2F2F7;
             --safe-bottom: env(safe-area-inset-bottom, 20px);
-            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
         }
 
         .theme-dark {
@@ -57,6 +58,8 @@
             width: 100vw;
             position: fixed;
             transition: background-color 0.3s ease, color 0.3s ease;
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
         }
 
         .modal-open-body {
@@ -114,11 +117,12 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        /* アクションシート & モーダル */
+        /* アクションシート & モーダル (横向き時も中央や下部に安全に収まるよう修正) */
         .action-sheet-wrap { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
         .as-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s ease; }
         .as-content {
             position: absolute; bottom: 0; left: 0; right: 0;
+            max-width: 600px; margin: 0 auto;
             padding: 10px; padding-bottom: calc(var(--safe-bottom) + 10px);
             transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
         }
@@ -128,6 +132,7 @@
 
         .modal-sheet {
             position: fixed; top: 20px; left: 0; right: 0; bottom: 0;
+            max-width: 600px; margin: 0 auto;
             background-color: var(--sheet-bg); border-radius: 12px 12px 0 0;
             z-index: 90; transform: translateY(100%);
             transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.3s ease;
@@ -150,13 +155,11 @@
 
     <div class="w-full h-full relative flex flex-col overflow-hidden">
 
-        <!-- ==========================================
-             コンテンツエリア
-        =========================================== -->
-        <div class="flex-1 relative overflow-hidden">
+        <!-- コンテンツエリア -->
+        <div class="flex-1 relative overflow-hidden flex flex-col">
             
             <!-- タブ1: ボード (掲示板) -->
-            <div id="view-board" class="view-section active h-full overflow-y-auto hide-scrollbar pb-32 px-5 pt-12">
+            <div id="view-board" class="view-section active h-full overflow-y-auto hide-scrollbar pb-32 px-5 pt-12 max-w-2xl mx-auto w-full">
                 <header class="mb-6 flex justify-between items-end">
                     <div>
                         <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1 italic">Daily Briefing / Murata</p>
@@ -224,7 +227,7 @@
             </div>
 
             <!-- タブ2: 編集 (Edit) -->
-            <div id="view-edit" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12">
+            <div id="view-edit" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12 max-w-2xl mx-auto w-full">
                 <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">編集</h1></header>
 
                 <h2 class="text-[12px] font-medium ml-4 mb-2 uppercase tracking-wider" style="color: var(--text-sub)">時間割設定 (プルダウン選択)</h2>
@@ -246,8 +249,8 @@
                 <div class="ios-list mb-8" id="edit-notices-list"></div>
             </div>
 
-            <!-- タブ3: 予定 (Calendar - 削除機能つき) -->
-            <div id="view-calendar" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12">
+            <!-- タブ3: 予定 (Calendar) -->
+            <div id="view-calendar" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12 max-w-2xl mx-auto w-full">
                 <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">予定</h1></header>
                 <div class="ios-card p-4 mb-6 active-scale">
                     <div class="flex justify-between items-center mb-4 px-2">
@@ -273,7 +276,7 @@
             </div>
             
             <!-- タブ4: 設定 (Settings) -->
-            <div id="view-settings" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12">
+            <div id="view-settings" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 pt-12 max-w-2xl mx-auto w-full">
                 <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">設定</h1></header>
 
                 <h2 class="text-[12px] font-medium uppercase ml-4 mb-2 tracking-wider" style="color: var(--text-sub)">外観</h2>
@@ -325,14 +328,12 @@
                     </div>
                 </div>
                 
-                <p class="text-center text-[12px] mt-10 font-normal tracking-widest uppercase" style="color: var(--text-sub)">BoardOS App 5.0.4</p>
+                <p class="text-center text-[12px] mt-10 font-normal tracking-widest uppercase" style="color: var(--text-sub)">BoardOS App 5.0.5</p>
             </div>
 
         </div>
 
-        <!-- ==========================================
-             ボトムタブバー
-        =========================================== -->
+        <!-- ボトムタブバー -->
         <nav class="absolute bottom-0 w-full h-[83px] glass-blur border-t border-[var(--separator)] flex justify-around items-start pt-[5px] z-50">
             <button onclick="switchTab('board')" id="tab-board" class="tab-btn flex flex-col items-center gap-[2px] w-[70px]" style="color: var(--blue)">
                 <i data-lucide="layout-dashboard" class="w-[26px] h-[26px]"></i>
@@ -359,7 +360,7 @@
         <div id="action-sheet" class="action-sheet-wrap">
             <div class="as-backdrop" onclick="closeActionSheet()"></div>
             <div class="as-content">
-                <div class="ios-list mb-2 text-center text-[18px] max-h-[300px] overflow-y-auto hide-scrollbar" id="as-options" style="background-color: var(--nav-bg); backdrop-filter: blur(20px);"></div>
+                <div class="ios-list mb-2 text-center text-[18px] max-h-[250px] overflow-y-auto hide-scrollbar" id="as-options" style="background-color: var(--nav-bg); backdrop-filter: blur(20px);"></div>
                 <div class="ios-list text-center text-[18px] font-semibold" style="background-color: var(--nav-bg); backdrop-filter: blur(20px);">
                     <button onclick="closeActionSheet()" class="w-full p-4 ios-btn" style="color: var(--blue)">キャンセル</button>
                 </div>
@@ -373,7 +374,7 @@
                 <h2 id="modal-title" class="text-[17px] font-semibold">新規作成</h2>
                 <button onclick="saveModalData()" class="text-[17px] font-semibold" style="color: var(--blue)">追加</button>
             </div>
-            <div class="p-4 overflow-y-auto flex-1" id="modal-body"></div>
+            <div class="p-4 overflow-y-auto flex-1 max-h-[60dvh]" id="modal-body"></div>
         </div>
 
     </div>
