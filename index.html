@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Murata BoardOS</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* =========================================
+           完全独立型のカラー変数 (ダーク/ホワイト分離)
+        ========================================= */
+        :root {
+            --bg-base: #F2F2F7;
+            --bg-card: #FFFFFF;
+            --text-main: #000000;
+            --text-sub: #8E8E93;
+            --border-light: rgba(0, 0, 0, 0.08);
+            --blue: #007AFF;
+            --red: #FF3B30;
+            --green: #34C759;
+            --orange: #FF9500;
+            --separator: rgba(60, 60, 67, 0.2);
+            --nav-bg: rgba(248, 248, 248, 0.85);
+            --sheet-bg: #F2F2F7;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --safe-top: env(safe-area-inset-top, 44px);
+        }
+
+        .theme-dark {
+            --bg-base: #000000;
+            --bg-card: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-sub: #98989D;
+            --border-light: rgba(255, 255, 255, 0.1);
+            --blue: #0A84FF;
+            --red: #FF453A;
+            --green: #32D74B;
+            --orange: #FF9F0A;
+            --separator: rgba(84, 84, 88, 0.65);
+            --nav-bg: rgba(28, 28, 30, 0.85);
+            --sheet-bg: #1C1C1E;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Hiragino Kaku Gothic ProN", sans-serif;
+            background-color: #222;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            overflow: hidden;
+            overscroll-behavior: none;
+            margin: 0;
+            height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #device-frame {
+            width: 100%; height: 100%; position: relative; overflow: hidden;
+            background-color: var(--bg-base); color: var(--text-main);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        @media (min-width: 640px) {
+            #device-frame {
+                width: 390px; height: 844px; border-radius: 40px;
+                border: 12px solid #111; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }
+            .device-notch { display: block !important; }
+        }
+
+        .modal-open-frame {
+            transform: scale(0.92) translateY(20px);
+            border-radius: 12px !important;
+            filter: brightness(0.5);
+            transition: all 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* コンポーネント */
+        .ios-card {
+            background-color: var(--bg-card); border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.03), 0 1px 4px rgba(0,0,0,0.02);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .ios-list {
+            background-color: var(--bg-card); border-radius: 12px; overflow: hidden;
+            transition: background-color 0.3s ease;
+        }
+        
+        .ios-list-item { position: relative; transition: background-color 0.2s ease; }
+        .ios-list-item:active, .ios-btn:active { background-color: rgba(120, 120, 128, 0.16); }
+        .ios-list-item:not(:last-child)::after {
+            content: ''; position: absolute; bottom: 0; left: 16px; right: 0;
+            height: 0.5px; background-color: var(--separator);
+        }
+
+        .active-scale { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .active-scale:active { transform: scale(0.96); }
+
+        .view-section { display: none; opacity: 0; }
+        .view-section.active { display: block; animation: fadeSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .glass-blur {
+            background-color: var(--nav-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+
+        .ios-toggle-bg { background-color: #E9E9EB; transition: background-color 0.3s ease; }
+        .theme-dark .ios-toggle-bg { background-color: #39393D; }
+        .ios-toggle:checked + .ios-toggle-bg { background-color: var(--green); }
+        .ios-toggle:checked + .ios-toggle-bg::after { transform: translateX(20px); border-color: white; }
+        .ios-toggle-bg::after {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 27px; height: 27px; background-color: white; border-radius: 50%;
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* アクションシート & モーダル */
+        .action-sheet-wrap { position: absolute; inset: 0; z-index: 100; pointer-events: none; }
+        .as-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s ease; }
+        .as-content {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 10px; padding-bottom: calc(var(--safe-bottom) + 10px);
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .action-sheet-wrap.open { pointer-events: auto; }
+        .action-sheet-wrap.open .as-backdrop { opacity: 1; }
+        .action-sheet-wrap.open .as-content { transform: translateY(0); }
+
+        .modal-sheet {
+            position: absolute; top: 20px; left: 0; right: 0; bottom: 0;
+            background-color: var(--sheet-bg); border-radius: 12px 12px 0 0;
+            z-index: 90; transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.3s ease;
+            box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
+        }
+        .modal-sheet.open { transform: translateY(0); }
+        .ios-input {
+            width: 100%; background: transparent; border: none; outline: none;
+            color: var(--text-main); font-size: 17px; padding: 0;
+        }
+        .ios-input::placeholder { color: var(--text-sub); }
+
+        .highlight-yellow {
+            background: linear-gradient(transparent 60%, rgba(255, 204, 0, 0.4) 40%);
+            padding: 0 2px; font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="device-frame">
+        <div class="device-notch hidden absolute top-0 left-1/2 -translate-x-1/2 w-[120px] h-[25px] bg-[#111] rounded-b-2xl z-50"></div>
+
+        <div id="app-content-wrap" class="w-full h-full relative" style="transition: all 0.4s cubic-bezier(0.32, 0.72, 0, 1);">
+            
+            <!-- ==========================================
+                 タブ1: ボード (掲示板)
+            =========================================== -->
+            <div id="view-board" class="view-section active h-full overflow-y-auto hide-scrollbar pb-32 px-5 sm:pt-10 pt-12">
+                <header class="mb-6 flex justify-between items-end">
+                    <div>
+                        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1 italic">Daily Briefing / Murata</p>
+                        <h1 class="text-[32px] font-bold tracking-tight leading-none">事務連絡</h1>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[18px] font-semibold tracking-tight mb-0.5">10/1 <span class="text-sm font-normal text-gray-400">(木)</span></p>
+                        <p class="text-[12px] font-medium text-gray-500 flex items-center justify-end gap-1"><i data-lucide="sun" class="w-3.5 h-3.5 text-orange-400"></i> 28℃</p>
+                    </div>
+                </header>
+
+                <div class="bg-blue-500/10 border border-[var(--blue)] rounded-[16px] p-3 px-5 mb-8 flex justify-between items-center active-scale">
+                    <span class="text-[12px] font-semibold" style="color: var(--blue)">布袋祭り</span>
+                    <div class="flex items-baseline gap-1" style="color: var(--blue)">
+                        <span class="text-xs font-normal">あと</span>
+                        <span class="text-[26px] font-bold tracking-tighter leading-none">10</span>
+                        <span class="text-xs font-normal">日</span>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-end mb-3">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-[16px] tracking-tight">次回の時間割</h3>
+                        </div>
+                        <div class="rounded-full px-2.5 py-1 flex items-center gap-1.5" style="background-color: var(--separator)">
+                            <i data-lucide="clock" class="w-3 h-3 text-gray-400"></i>
+                            <span class="text-[11px] font-medium" id="board-style">45分授業</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2.5 overflow-x-auto hide-scrollbar pb-2" id="board-timetable"></div>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex items-center gap-2 mb-3">
+                        <h3 class="font-bold text-[16px] tracking-tight">今後の予定ライン</h3>
+                    </div>
+                    <div class="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-5 px-5 snap-x">
+                        <div class="ios-card p-4 w-[240px] shrink-0 active-scale snap-center relative overflow-hidden">
+                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gray-400"></div>
+                            <div class="pl-2 flex justify-between items-start mb-2 border-b border-[var(--border-light)] pb-2">
+                                <div>
+                                    <span class="text-[9px] font-semibold text-gray-400">10月</span>
+                                    <span class="text-[20px] font-bold leading-none block mt-0.5">2 <span class="text-[10px] font-normal text-gray-400">(金)</span></span>
+                                </div>
+                                <span class="text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1" style="background-color: var(--separator);"><i data-lucide="paperclip" class="w-3 h-3"></i> その他</span>
+                            </div>
+                            <div class="pl-2">
+                                <h4 class="font-semibold text-[15px] mb-1">福祉祭り</h4>
+                                <p class="text-[12px] text-gray-400 line-clamp-2 leading-relaxed">町民体育館で福祉祭りがあります 吹奏楽部が演奏します♪</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-dashed bg-blue-500/5 rounded-2xl p-4 mb-8 active-scale" style="border-color: var(--blue)">
+                    <div class="flex items-center gap-2 mb-2" style="color: var(--blue)">
+                        <i data-lucide="calendar-clock" class="w-4 h-4 p-0.5 text-white rounded" style="background-color: var(--blue)"></i>
+                        <span class="text-[11px] font-semibold tracking-tight">【明日の予定自動連携】(その他) — 福祉祭り</span>
+                    </div>
+                    <p class="text-[13px] font-normal leading-relaxed">町民体育館で福祉祭りがあります 吹奏楽部が演奏します♪(10/4 | 9:30:開演)</p>
+                </div>
+
+                <div class="space-y-4" id="board-notices"></div>
+            </div>
+
+            <!-- ==========================================
+                 タブ2: 編集 (Edit)
+            =========================================== -->
+            <div id="view-edit" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 sm:pt-10 pt-12">
+                <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">編集</h1></header>
+
+                <h2 class="text-[12px] font-medium ml-4 mb-2 uppercase tracking-wider" style="color: var(--text-sub)">時間割設定 (プルダウン選択)</h2>
+                <div class="ios-list mb-8">
+                    <div class="ios-list-item flex items-center justify-between p-4 ios-btn cursor-pointer" onclick="openActionSheet('style')">
+                        <span class="text-[17px]">授業スタイル</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[17px]" style="color: var(--text-sub)" id="val-style">45分授業</span>
+                            <i data-lucide="chevron-up-down" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                    </div>
+                    <div id="edit-timetable-list"></div>
+                </div>
+
+                <div class="flex justify-between items-end ml-4 mb-2">
+                    <h2 class="text-[12px] font-medium uppercase tracking-wider" style="color: var(--text-sub)">掲示項目の管理</h2>
+                    <button onclick="openNoticeModal()" class="text-[15px] font-medium pr-4" style="color: var(--blue)">＋ 新規追加</button>
+                </div>
+                <div class="ios-list mb-8" id="edit-notices-list"></div>
+            </div>
+
+            <!-- ==========================================
+                 タブ3: 予定 (Calendar)
+            =========================================== -->
+            <div id="view-calendar" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 sm:pt-10 pt-12">
+                <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">予定</h1></header>
+                <div class="ios-card p-4 mb-6 active-scale">
+                    <div class="flex justify-between items-center mb-4 px-2">
+                        <h2 id="cal-month-title" class="text-[17px] font-bold" style="color: var(--red)">2026年 10月</h2>
+                        <div class="flex gap-4">
+                            <button onclick="changeMonth(-1)" class="p-1 rounded-full active-scale"><i data-lucide="chevron-left" class="w-6 h-6" style="color: var(--blue)"></i></button>
+                            <button onclick="changeMonth(1)" class="p-1 rounded-full active-scale"><i data-lucide="chevron-right" class="w-6 h-6" style="color: var(--blue)"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-medium mb-2" style="color: var(--text-sub)">
+                        <div style="color: var(--red)">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div style="color: var(--blue)">土</div>
+                    </div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-y-1 gap-x-1 text-center text-[16px] items-start pb-2"></div>
+                </div>
+                <h2 id="selected-date-title" class="text-[12px] font-medium ml-4 mb-2 uppercase tracking-wider" style="color: var(--text-sub)">10月2日の予定</h2>
+                <div class="ios-list">
+                    <div id="event-list"></div>
+                    <div onclick="openEventModal()" class="ios-btn flex items-center p-4 gap-2 justify-center cursor-pointer" style="color: var(--blue)">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        <span class="text-[17px] font-medium">予定を追加</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ==========================================
+                 タブ4: 設定 (Settings)
+            =========================================== -->
+            <div id="view-settings" class="view-section h-full overflow-y-auto hide-scrollbar pb-32 px-4 sm:pt-10 pt-12">
+                <header class="mb-6"><h1 class="text-[32px] font-bold tracking-tight">設定</h1></header>
+
+                <h2 class="text-[12px] font-medium uppercase ml-4 mb-2 tracking-wider" style="color: var(--text-sub)">外観</h2>
+                <div class="ios-list mb-8">
+                    <div class="ios-list-item flex items-center justify-between p-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-black dark:bg-zinc-800 p-1.5 rounded-lg"><i data-lucide="moon" class="w-5 h-5 text-white"></i></div>
+                            <span class="text-[17px]">ダークモード</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="theme-toggle" class="sr-only ios-toggle" onchange="toggleTheme()">
+                            <div class="w-[51px] h-[31px] rounded-full ios-toggle-bg relative"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <h2 class="text-[12px] font-medium uppercase ml-4 mb-2 tracking-wider" style="color: var(--text-sub)">通知設定 (3種)</h2>
+                <div class="ios-list mb-8">
+                    <div class="ios-list-item flex items-center justify-between p-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-1.5 rounded-lg bg-red-500"><i data-lucide="bell" class="w-5 h-5 text-white"></i></div>
+                            <span class="text-[17px]">プッシュ通知</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only ios-toggle" checked onchange="haptic()">
+                            <div class="w-[51px] h-[31px] rounded-full ios-toggle-bg relative"></div>
+                        </label>
+                    </div>
+                    <div class="ios-list-item flex items-center justify-between p-4 ios-btn cursor-pointer" onclick="openActionSheet('sound')">
+                        <span class="text-[17px] ml-11">サウンド効果</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[17px]" style="color: var(--text-sub)" id="val-sound">チャイム</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                    </div>
+                    <div class="ios-list-item flex items-center justify-between p-4">
+                        <span class="text-[17px] ml-11">バッジ表示</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only ios-toggle" checked onchange="haptic()">
+                            <div class="w-[51px] h-[31px] rounded-full ios-toggle-bg relative"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <h2 class="text-[12px] font-medium uppercase ml-4 mb-2 tracking-wider" style="color: var(--text-sub)">システム</h2>
+                <div class="ios-list mb-8">
+                    <div class="ios-list-item flex items-center justify-between p-4 ios-btn cursor-pointer" onclick="resetData()">
+                        <span class="text-[17px]" style="color: var(--red)">すべての設定・データをリセット</span>
+                    </div>
+                </div>
+                
+                <p class="text-center text-[12px] mt-10 font-normal tracking-widest uppercase" style="color: var(--text-sub)">BoardOS App 5.0.3</p>
+            </div>
+
+        </div>
+
+        <!-- ボトムタブバー -->
+        <nav class="absolute bottom-0 w-full h-[83px] glass-blur border-t border-[var(--separator)] flex justify-around items-start pt-[5px] z-50">
+            <button onclick="switchTab('board')" id="tab-board" class="tab-btn flex flex-col items-center gap-[2px] w-[70px]" style="color: var(--blue)">
+                <i data-lucide="layout-dashboard" class="w-[26px] h-[26px]"></i>
+                <span class="text-[10px] font-medium tracking-wide">ボード</span>
+            </button>
+            <button onclick="switchTab('edit')" id="tab-edit" class="tab-btn flex flex-col items-center gap-[2px] w-[70px]" style="color: var(--text-sub)">
+                <i data-lucide="edit-3" class="w-[26px] h-[26px]"></i>
+                <span class="text-[10px] font-medium tracking-wide">編集</span>
+            </button>
+            <button onclick="switchTab('calendar')" id="tab-calendar" class="tab-btn flex flex-col items-center gap-[2px] w-[70px]" style="color: var(--text-sub)">
+                <i data-lucide="calendar" class="w-[26px] h-[26px]"></i>
+                <span class="text-[10px] font-medium tracking-wide">予定</span>
+            </button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn flex flex-col items-center gap-[2px] w-[70px]" style="color: var(--text-sub)">
+                <i data-lucide="settings" class="w-[26px] h-[26px]"></i>
+                <span class="text-[10px] font-medium tracking-wide">設定</span>
+            </button>
+        </nav>
+
+        <!-- ホームインジケーター -->
+        <div class="absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[134px] h-[5px] rounded-full z-50" style="background-color: var(--text-main); opacity: 0.3;"></div>
+
+        <!-- Action Sheet (プルダウン用) -->
+        <div id="action-sheet" class="action-sheet-wrap">
+            <div class="as-backdrop" onclick="closeActionSheet()"></div>
+            <div class="as-content">
+                <div class="ios-list mb-2 text-center text-[18px] max-h-[300px] overflow-y-auto hide-scrollbar" id="as-options" style="background-color: var(--nav-bg); backdrop-filter: blur(20px);"></div>
+                <div class="ios-list text-center text-[18px] font-semibold" style="background-color: var(--nav-bg); backdrop-filter: blur(20px);">
+                    <button onclick="closeActionSheet()" class="w-full p-4 ios-btn" style="color: var(--blue)">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Sheet -->
+        <div id="general-modal" class="modal-sheet flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-[var(--separator)]">
+                <button onclick="closeModal()" class="text-[17px]" style="color: var(--blue)">キャンセル</button>
+                <h2 id="modal-title" class="text-[17px] font-semibold">新規作成</h2>
+                <button onclick="saveModalData()" class="text-[17px] font-semibold" style="color: var(--blue)">追加</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1" id="modal-body"></div>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+        function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
+
+        const initialData = {
+            style: '45分授業',
+            sound: 'チャイム',
+            timetable: ['英語', '国語', '体育', '学活', '合唱', '布袋'],
+            notices: [
+                { id: 1, type: 'normal', title: '宿題・自学', icon: 'pencil', lines: ['フリー自学4ページ', '<span class="highlight-yellow">※社会・理科はフリーに変更</span>'] },
+                { id: 2, type: 'normal', title: 'アンケートにご協力ください', icon: 'alert-circle', lines: ['添付リンクからboardOSのアンケートは、', '今日 <span class="highlight-yellow">夜7時ごろに完全〆切します</span>'] },
+                { id: 3, type: 'normal', title: '来週の給食（仮案）', icon: 'megaphone', lines: ['わかめの和物', 'スタミナ丼の具', 'ご飯', '白菜とエノキの味噌汁'] },
+                { id: 4, type: 'normal', title: '「学習の記録」の提出日は10/8', icon: 'clock', lines: ['学習の記録の提出は<span class="highlight-yellow">10月8日(木)</span>', '来週の木曜日です'] },
+                { id: 5, type: 'special', title: '明日の下校時間', icon: 'footprints', lines: ['報告会終了: 15:45', '完全下校(延長部除く): 17:00'], color: 'var(--green)' }
+            ],
+            events: {
+                '2026-10-02': [{ title: '単元テスト（数学）', desc: 'P.45〜P.50 二次方程式', color: 'var(--red)' }],
+                '2026-10-05': [{ title: '漢字テスト', desc: '詳細なし', color: 'var(--blue)' }]
+            }
+        };
+
+        let appData = JSON.parse(localStorage.getItem('murata_board_data_v3')) || JSON.parse(JSON.stringify(initialData));
+        
+        function saveData() { localStorage.setItem('murata_board_data_v3', JSON.stringify(appData)); renderAll(); }
+        function resetData() {
+            if(confirm("すべての設定とデータをリセットしますか？")) {
+                localStorage.removeItem('murata_board_data_v3');
+                appData = JSON.parse(JSON.stringify(initialData));
+                renderAll(); haptic();
+            }
+        }
+
+        function switchTab(tabName) {
+            haptic();
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + tabName).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.style.color = 'var(--text-sub)');
+            document.getElementById('tab-' + tabName).style.color = 'var(--blue)';
+        }
+
+        function toggleTheme() {
+            haptic();
+            const isDark = document.getElementById('theme-toggle').checked;
+            const frame = document.getElementById('device-frame');
+            if (isDark) { frame.classList.add('theme-dark'); } 
+            else { frame.classList.remove('theme-dark'); }
+        }
+
+        function renderAll() {
+            renderTimetable(); renderNotices(); renderCalendar();
+            document.getElementById('board-style').innerText = appData.style;
+            document.getElementById('val-style').innerText = appData.style;
+            document.getElementById('val-sound').innerText = appData.sound;
+            lucide.createIcons();
+        }
+
+        function renderTimetable() {
+            const boardGrid = document.getElementById('board-timetable');
+            boardGrid.innerHTML = appData.timetable.map((subj, i) => `
+                <div class="ios-card border min-w-[70px] shrink-0 p-2 text-center flex flex-col items-center justify-center active-scale" style="border-color: var(--separator); background-color: var(--bg-card)">
+                    <span class="text-[9px] font-semibold text-gray-400 block mb-0.5">${i+1}</span>
+                    <span class="text-[15px] font-bold">${subj}</span>
+                </div>
+            `).join('');
+
+            const editList = document.getElementById('edit-timetable-list');
+            editList.innerHTML = appData.timetable.map((subj, i) => `
+                <div class="ios-list-item flex items-center p-4 gap-4 ios-btn cursor-pointer" onclick="openSubjectSelect(${i})">
+                    <span class="text-[17px] w-8" style="color: var(--text-sub)">${i+1}限</span>
+                    <span class="text-[17px] flex-1 font-semibold">${subj}</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+                </div>
+            `).join('');
+        }
+
+        function renderNotices() {
+            const boardNotices = document.getElementById('board-notices');
+            boardNotices.innerHTML = appData.notices.map(n => {
+                if(n.type === 'special') {
+                    return `
+                    <div class="ios-card p-4 border active-scale" style="border-color: ${n.color}">
+                        <div class="flex items-center gap-2 mb-2" style="color: ${n.color}">
+                            <i data-lucide="${n.icon}" class="w-5 h-5 text-white p-1 rounded-full" style="background-color: ${n.color}"></i>
+                            <h3 class="text-sm font-bold">${n.title}</h3>
+                        </div>
+                        <div class="text-[14px] font-normal leading-relaxed">${n.lines.join('<br>')}</div>
+                    </div>`;
+                } else {
+                    return `
+                    <div class="ios-card p-5 active-scale">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="${n.icon}" class="w-4 h-4 text-gray-400"></i>
+                            <h3 class="font-semibold text-[11px] tracking-wider uppercase text-gray-400">${n.title}</h3>
+                        </div>
+                        <div class="text-[14px] font-normal space-y-2">
+                            ${n.lines.map(line => `<p class="flex items-start gap-2"><span class="text-gray-300">•</span> <span>${line}</span></p>`).join('')}
+                        </div>
+                    </div>`;
+                }
+            }).join('');
+
+            const editNotices = document.getElementById('edit-notices-list');
+            editNotices.innerHTML = appData.notices.map(n => `
+                <div class="ios-list-item flex items-center justify-between p-4 gap-3 ios-btn">
+                    <div class="flex items-center gap-3 w-full">
+                        <i data-lucide="${n.icon}" class="w-5 h-5 text-gray-400 shrink-0"></i>
+                        <div class="flex-1 text-[17px] font-semibold">${n.title}</div>
+                    </div>
+                    <button onclick="deleteNotice(${n.id})" class="p-1 rounded-full active-scale">
+                        <i data-lucide="minus-circle" class="w-6 h-6 text-red-500 shrink-0"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // --- Action Sheet (プルダウン) ---
+        let currentActionType = '';
+        let currentPeriod = 0;
+
+        function openActionSheet(type) {
+            haptic();
+            currentActionType = type;
+            let options = [];
+            if (type === 'style') options = ['50分授業', '45分授業', 'B日程'];
+            if (type === 'sound') options = ['チャイム', 'デフォルト', 'なし'];
+
+            document.getElementById('as-options').innerHTML = options.map(s => `
+                <button onclick="handleActionSelect('${s}')" class="w-full p-4 ios-btn border-b border-[var(--separator)] text-[18px]" style="color: var(--blue)">${s}</button>
+            `).join('');
+            document.getElementById('action-sheet').classList.add('open');
+        }
+
+        function openSubjectSelect(index) {
+            haptic();
+            currentActionType = 'subject'; currentPeriod = index;
+            const subjects = ['国語', '数学', '英語', '理科', '社会', '体育', '音楽', '美術', '技術・家庭', '学活', '総合', '合唱', '布袋', 'カスタム入力...'];
+            
+            document.getElementById('as-options').innerHTML = subjects.map(s => `
+                <button onclick="handleActionSelect('${s}')" class="w-full p-4 ios-btn border-b border-[var(--separator)] text-[18px]" style="color: var(--blue)">${s}</button>
+            `).join('');
+            document.getElementById('action-sheet').classList.add('open');
+        }
+
+        function handleActionSelect(val) {
+            haptic();
+            if (currentActionType === 'style') {
+                appData.style = val;
+            } else if (currentActionType === 'sound') {
+                appData.sound = val;
+            } else if (currentActionType === 'subject') {
+                if(val === 'カスタム入力...') {
+                    closeActionSheet();
+                    setTimeout(() => {
+                        const custom = prompt('教科名を入力 (6文字以内)');
+                        if(custom) { appData.timetable[currentPeriod] = custom.substring(0,6); saveData(); }
+                    }, 300); return;
+                }
+                appData.timetable[currentPeriod] = val;
+            }
+            saveData(); closeActionSheet();
+        }
+        function closeActionSheet() { document.getElementById('action-sheet').classList.remove('open'); }
+
+        // --- カレンダー ---
+        let currYear = 2026; let currMonth = 9; let selDate = 2;
+        function renderCalendar() {
+            document.getElementById('cal-month-title').innerText = `${currYear}年 ${currMonth + 1}月`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            const firstDay = new Date(currYear, currMonth, 1).getDay();
+            const daysInMonth = new Date(currYear, currMonth + 1, 0).getDate();
+            const prevDays = new Date(currYear, currMonth, 0).getDate();
+
+            for (let i = firstDay - 1; i >= 0; i--) { grid.innerHTML += `<div class="py-1.5 text-[16px] opacity-30" style="color: var(--text-sub)">${prevDays - i}</div>`; }
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateKey = `${currYear}-${String(currMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const hasEvent = appData.events[dateKey];
+                const isSelected = (day === selDate);
+                
+                let html = `<button onclick="selectDate(${day})" class="py-1.5 flex flex-col items-center w-full rounded-xl ios-btn">`;
+                if (isSelected) { html += `<span class="w-[28px] h-[28px] flex items-center justify-center text-white rounded-full font-semibold text-[16px]" style="background-color: var(--red)">${day}</span>`; } 
+                else { html += `<span class="w-[28px] h-[28px] flex items-center justify-center text-[16px] font-normal">${day}</span>`; }
+                html += `<div class="w-1.5 h-1.5 mt-1 ${hasEvent ? 'rounded-full' : ''}" style="${hasEvent ? 'background-color: var(--text-sub)' : ''}"></div></button>`;
+                grid.innerHTML += html;
+            }
+            updateEventList();
+        }
+
+        function changeMonth(delta) {
+            haptic(); currMonth += delta;
+            if(currMonth > 11) { currMonth = 0; currYear++; }
+            if(currMonth < 0) { currMonth = 11; currYear--; }
+            selDate = 1; renderCalendar();
+        }
+        function selectDate(day) { haptic(); selDate = day; renderCalendar(); }
+
+        function updateEventList() {
+            document.getElementById('selected-date-title').innerText = `${currMonth + 1}月${selDate}日の予定`;
+            const list = document.getElementById('event-list');
+            const dayEvents = appData.events[`${currYear}-${String(currMonth + 1).padStart(2, '0')}-${String(selDate).padStart(2, '0')}`];
+            if (dayEvents) {
+                list.innerHTML = dayEvents.map(e => `
+                    <div class="ios-list-item p-4 flex gap-3 ios-btn">
+                        <div class="w-1 rounded-full shrink-0" style="background-color: ${e.color}"></div>
+                        <div>
+                            <h4 class="font-semibold text-[17px]">${e.title}</h4>
+                            <p class="text-[14px] font-normal mt-0.5" style="color: var(--text-sub)">${e.desc}</p>
+                        </div>
+                    </div>`).join('');
+            } else { list.innerHTML = `<div class="p-6 text-center text-[15px]" style="color: var(--text-sub)">予定はありません</div>`; }
+        }
+
+        // --- Modal Sheet (アイコン選択対応) ---
+        let currentModalMode = '';
+        let selectedIcon = 'pencil';
+
+        function openEventModal() {
+            haptic(); currentModalMode = 'event'; document.getElementById('modal-title').innerText = '新規イベント';
+            document.getElementById('modal-body').innerHTML = `
+                <div class="ios-list mb-6">
+                    <div class="p-3 ios-list-item"><input type="text" id="ev-title" class="ios-input" placeholder="タイトル (例: テスト)"></div>
+                    <div class="p-3 ios-list-item"><input type="text" id="ev-desc" class="ios-input" placeholder="詳細 (例: 範囲など)"></div>
+                </div>`;
+            showModal();
+        }
+
+        function openNoticeModal() {
+            haptic(); currentModalMode = 'notice'; selectedIcon = 'pencil'; document.getElementById('modal-title').innerText = '新規掲示項目';
+            document.getElementById('modal-body').innerHTML = `
+                <div class="ios-list mb-4">
+                    <div class="p-3 ios-list-item"><input type="text" id="not-title" class="ios-input" placeholder="見出し (例: 持ち物)"></div>
+                    <div class="p-3 ios-list-item"><textarea id="not-desc" class="ios-input hide-scrollbar" rows="3" placeholder="内容 (改行で箇条書き)"></textarea></div>
+                </div>
+                <p class="text-[12px] font-medium ml-4 mb-2 text-gray-400 uppercase">アイコンを選択</p>
+                <div class="ios-list p-3 flex justify-around">
+                    <button onclick="pickIcon('pencil', this)" class="p-2 rounded-xl bg-blue-500/20 icon-btn text-blue-500"><i data-lucide="pencil" class="w-6 h-6"></i></button>
+                    <button onclick="pickIcon('alert-circle', this)" class="p-2 rounded-xl icon-btn text-gray-400"><i data-lucide="alert-circle" class="w-6 h-6"></i></button>
+                    <button onclick="pickIcon('megaphone', this)" class="p-2 rounded-xl icon-btn text-gray-400"><i data-lucide="megaphone" class="w-6 h-6"></i></button>
+                    <button onclick="pickIcon('clock', this)" class="p-2 rounded-xl icon-btn text-gray-400"><i data-lucide="clock" class="w-6 h-6"></i></button>
+                    <button onclick="pickIcon('footprints', this)" class="p-2 rounded-xl icon-btn text-gray-400"><i data-lucide="footprints" class="w-6 h-6"></i></button>
+                </div>`;
+            showModal();
+            lucide.createIcons();
+        }
+
+        function pickIcon(iconName, btn) {
+            haptic();
+            selectedIcon = iconName;
+            document.querySelectorAll('.icon-btn').forEach(b => {
+                b.className = "p-2 rounded-xl icon-btn text-gray-400";
+            });
+            btn.className = "p-2 rounded-xl icon-btn text-blue-500 bg-blue-500/20";
+        }
+
+        function showModal() {
+            document.getElementById('app-content-wrap').classList.add('modal-open-frame');
+            document.getElementById('general-modal').classList.add('open');
+        }
+        function closeModal() {
+            haptic();
+            document.getElementById('app-content-wrap').classList.remove('modal-open-frame');
+            document.getElementById('general-modal').classList.remove('open');
+        }
+
+        function saveModalData() {
+            haptic();
+            if (currentModalMode === 'event') {
+                const title = document.getElementById('ev-title').value.trim();
+                if(!title) return alert('タイトルを入力してください');
+                const dateKey = `${currYear}-${String(currMonth + 1).padStart(2, '0')}-${String(selDate).padStart(2, '0')}`;
+                if(!appData.events[dateKey]) appData.events[dateKey] = [];
+                appData.events[dateKey].push({ title, desc: document.getElementById('ev-desc').value.trim(), color: 'var(--blue)' });
+            } else if (currentModalMode === 'notice') {
+                const title = document.getElementById('not-title').value.trim();
+                const desc = document.getElementById('not-desc').value.trim();
+                if(!title || !desc) return alert('入力してください');
+                appData.notices.push({ id: Date.now(), type: 'normal', title, icon: selectedIcon, lines: desc.split('\n').filter(l => l.trim() !== '') });
+            }
+            saveData(); closeModal();
+        }
+
+        function deleteNotice(id) { haptic(); appData.notices = appData.notices.filter(n => n.id !== id); saveData(); }
+
+        renderAll();
+    </script>
+</body>
+</html>
